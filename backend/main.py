@@ -584,8 +584,18 @@ tools = [
     }},
 ]
 
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT_TEMPLATE = """
 Jestes osobistym asystentem zarzadzajacym kalendarzem, przypomnieniami i notatkami uzytkownika.
+
+{now_block}
+
+ZASADA NADRZEDNA: Nigdy nie pisz, ze cos zostalo zaplanowane, dodane lub zapisane, jesli nie zrobiles
+tego narzedziem w tej samej turze. Kiedy uzytkownik prosi o zaplanowanie czegos, od razu wykonaj
+potrzebne wywolania create_calendar_event / create_reminder / update_calendar_event dla KAZDEGO
+elementu planu - jedno po drugim - a dopiero potem opisz gotowy harmonogram jako fakt dokonany. Nie
+pytaj o zgode na plan, ktory jestes w stanie ulozyc z podanych informacji - po prostu go zapisz. Pytaj
+o potwierdzenie tylko wtedy, gdy naprawde nie jestes pewien, co zrobic (patrz sekcja PYTANIA nizej).
+
 Zawsze korzystaj z dostarczonych narzedzi do odczytu i zmiany danych - nigdy nie zgaduj dat, godzin
 ani tresci istniejacych wydarzen, przypomnien czy notatek.
 Daty podawaj w formacie YYYY-MM-DD, godziny w formacie HH:MM (24h).
@@ -595,14 +605,36 @@ aby uniknac konfliktow w czasie - jesli konflikt wystapi, zaproponuj wolny termi
 Jesli uzytkownik poprawia Twoja decyzje lub podaje stala preferencje (np. "trening zawsze trwa 40 minut"),
 zapisz ja narzedziem update_user_preferences i wykorzystuj przy kolejnym planowaniu - sprawdzaj
 get_user_preferences zanim zaplanujesz nawyki takie jak trening, praca czy sen.
-Jesli brakuje informacji niezbednych do wykonania akcji, dopytaj krotko zamiast zgadywac.
+
+PYTANIA: zadawaj ich jak najmniej. Zbierz wszystkie brakujace informacje w JEDNYM pytaniu zamiast w
+kilku kolejnych turach. Jesli czegos nie podano, a da sie przyjac rozsadne zalozenie domyslne (np.
+nieznany czas trwania wizyty u lekarza = 1 godzina, "teraz" = aktualna godzina podana wyzej), przyjmij
+je i napisz w odpowiedzi, jakie zalozenie przyjales, zamiast dopytywac. Pytaj tylko wtedy, gdy
+brakujaca informacja naprawde uniemozliwia wykonanie akcji (np. nie wiadomo, ktorego dnia cos ma sie
+odbyc).
+
 Odpowiadaj krotko, po polsku, bez markdown i bez emoji.
 """
 
 
+def build_system_prompt() -> str:
+    """Injects the real current date/time as a fact, instead of relying on
+    the model to decide to call get_current_time (small local models tend
+    to anchor on dates already mentioned earlier in the chat history and
+    skip re-checking, even when explicitly told to)."""
+    now = datetime.datetime.now(ZoneInfo("Europe/Warsaw"))
+    now_block = (
+        f"Dzisiaj jest {now.strftime('%A')}, {now.strftime('%Y-%m-%d')}, "
+        f"aktualna godzina to {now.strftime('%H:%M')} (Europe/Warsaw). To jest zawsze aktualna, "
+        f"prawdziwa wartosc - ignoruj wszelkie inne daty/godziny wspomniane wczesniej w historii "
+        f"tej rozmowy, mogly pochodzic z poprzedniego dnia."
+    )
+    return SYSTEM_PROMPT_TEMPLATE.format(now_block=now_block)
+
+
 def run_agent(user_message: str) -> str:
     history = [{"role": m["role"], "content": m["content"]} for m in load_recent_messages(20)]
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [
+    messages = [{"role": "system", "content": build_system_prompt()}] + history + [
         {"role": "user", "content": user_message}
     ]
     save_message("user", user_message)

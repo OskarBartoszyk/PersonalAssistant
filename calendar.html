@@ -44,37 +44,33 @@
     color:var(--text);
     font-family:var(--font-body);
     -webkit-font-smoothing:antialiased;
-    display:flex;
-    align-items:center;
-    justify-content:center;
     overflow:hidden;
   }
 
-  /* ===================== APP SHELL — 3/4 of the screen ===================== */
+  /* ===================== APP SHELL — whole page, 3 columns: notes/reminders | calendar | chat ===================== */
   .app-shell{
-    width:75vw;
-    height:75vh;
+    width:100vw;
+    height:100vh;
     min-width:920px;
     min-height:560px;
     background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:18px;
-    box-shadow:0 40px 90px -20px rgba(0,0,0,0.6);
     position:relative;
-    display:flex;
+    display:grid;
+    grid-template-columns: 240px minmax(0,1fr) 320px;
+    grid-template-rows: 100%;
     overflow:hidden;
   }
 
-  /* ===================== LEFT COLUMN — 1/4 width ===================== */
+  /* ===================== LEFT COLUMN — reminders (top) + notes (bottom) ===================== */
   .left-col{
-    width:25%;
-    min-width:230px;
-    flex:none;
+    grid-column:1;
+    min-width:0;
     display:flex;
     flex-direction:column;
     border-right:1px solid var(--border);
     background:var(--panel);
     height:100%;
+    min-height:0;
   }
 
   .left-col section{
@@ -108,8 +104,23 @@
   .mini-add:hover{ color:var(--text); border-color:var(--brass-dim); }
   .mini-add:focus-visible{ outline:2px solid var(--brass); outline-offset:1px; }
 
-  /* --- Calendar panel (top, tallest) --- */
-  .cal-panel{ flex:1.5 1 0; }
+  .rem-panel{ flex:1 1 0; }
+  .note-panel{ flex:1.3 1 0; }
+
+  /* --- Calendar panel (now the big center column) --- */
+  .center-col{
+    grid-column:2;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:0;
+    border-right:1px solid var(--border);
+    background:var(--panel);
+  }
+  .center-col .panel-head{ padding:18px 22px 10px; }
+  .center-col .panel-title{ font-size:22px; }
+  .center-col .cal-nav{ padding:0 22px 12px; font-size:12px; }
   .cal-nav{
     display:flex; align-items:center; gap:6px; padding:0 12px 8px;
     font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); flex:none;
@@ -142,72 +153,91 @@
 
   .cal-event{
     position:absolute; border-radius:6px; padding:3px 6px; overflow:hidden; cursor:pointer;
+    border:1px solid rgba(12,15,22,0.28); box-shadow:0 2px 6px -2px rgba(0,0,0,0.5);
+    box-sizing:border-box;
   }
-  .cal-event:hover{ filter:brightness(1.12); }
+  .cal-event:hover{ filter:brightness(1.12); z-index:6; box-shadow:0 4px 12px -3px rgba(0,0,0,0.6); }
   .cal-event-title{ font-size:10.5px; font-weight:600; color:#0C0F16; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .cal-event-time{ font-family:var(--font-mono); font-size:8px; color:rgba(12,15,22,0.72); }
 
   .cal-empty{ padding:26px 14px; text-align:center; color:var(--text-faint); font-size:11.5px; }
 
-  /* --- Reminders / Notes lists (shared list style) --- */
+  .cal-drag-preview{
+    position:absolute; left:2px; right:3px; border-radius:6px;
+    background:rgba(205,163,73,0.22); border:1.5px dashed var(--brass);
+    pointer-events:none; z-index:4;
+  }
+  .cal-drag-preview .cal-drag-label{
+    position:absolute; top:2px; left:6px; font-family:var(--font-mono); font-size:9.5px; color:var(--brass);
+    white-space:nowrap;
+  }
+
+  /* --- Reminders list --- */
   .side-list{ flex:1; overflow-y:auto; padding:4px 10px 10px; display:flex; flex-direction:column; gap:6px; }
-  .rem-item, .note-item{
+  .rem-item{
     background:var(--panel-raised); border:1px solid var(--border-soft); border-radius:9px;
     padding:7px 9px; cursor:pointer; display:flex; align-items:flex-start; gap:7px;
   }
-  .rem-item:hover, .note-item:hover{ border-color:var(--brass-dim); }
+  .rem-item:hover{ border-color:var(--brass-dim); }
   .rem-check{
     width:14px; height:14px; border-radius:4px; border:1.5px solid var(--text-faint);
     flex:none; margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center;
   }
   .rem-check.done{ background:var(--brass); border-color:var(--brass); }
   .rem-check.done::after{ content:'✓'; font-size:9px; color:#1A1508; font-weight:700; }
-  .rem-body, .note-body{ min-width:0; flex:1; }
+  .rem-body{ min-width:0; flex:1; }
   .rem-time{ font-family:var(--font-mono); font-size:9px; color:var(--brass); }
   .rem-text{ font-size:12px; color:var(--text); line-height:1.3; }
-  .rem-item.done .rem-text{ color:var(--text-faint); text-decoration:line-through; }
-  .note-title{ font-size:12px; font-weight:600; color:var(--text); }
-  .note-snippet{ font-size:11px; color:var(--text-muted); line-height:1.3; margin-top:1px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .side-empty{ padding:14px 4px; text-align:center; color:var(--text-faint); font-size:11px; }
 
-  /* ===================== RIGHT COLUMN — 3/4 width, chat overlay ===================== */
+  /* --- Notes list — distinct card style: brass accent spine, header row, bigger snippet --- */
+  .note-item{
+    background:linear-gradient(160deg, var(--panel-raised), var(--panel-sunken));
+    border:1px solid var(--border-soft); border-left:3px solid var(--brass-dim);
+    border-radius:8px; padding:9px 11px 10px; cursor:pointer;
+    display:flex; flex-direction:column; gap:3px;
+    transition:border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .note-item:hover{
+    border-color:var(--brass-dim); border-left-color:var(--brass);
+    transform:translateY(-1px); box-shadow:0 8px 18px -10px rgba(0,0,0,0.6);
+  }
+  .note-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .note-title{ font-family:var(--font-display); font-size:13px; font-weight:600; color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .note-time{ font-family:var(--font-mono); font-size:8.5px; color:var(--text-faint); flex:none; }
+  .note-snippet{ font-size:11.5px; color:var(--text-muted); line-height:1.42; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+  .note-snippet:empty::before{ content:'Brak treści'; color:var(--text-faint); font-style:italic; }
+
+  /* ===================== RIGHT COLUMN — collapsible chat sidebar ===================== */
   .right-col{
-    flex:1; position:relative; overflow:hidden;
+    grid-column:3;
+    min-width:0;
+    position:relative;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    height:100%;
     background:
       radial-gradient(500px 300px at 80% 20%, rgba(205,163,73,0.05), transparent),
       var(--panel-sunken);
+    transition:opacity .18s ease;
   }
-  .right-col-hint{
-    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:8px; color:var(--text-faint); pointer-events:none; text-align:center; padding:0 40px;
-  }
-  .right-col-hint .glyph{ font-size:28px; opacity:.5; }
-  .right-col-hint .eyebrow{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; }
-  .right-col-hint .sub{ font-family:var(--font-body); font-size:12.5px; max-width:260px; }
+  .app-shell.chat-collapsed{ grid-template-columns: 240px minmax(0,1fr) 0px; }
+  .app-shell.chat-collapsed .right-col{ opacity:0; pointer-events:none; }
 
   .chat-tab{
-    position:absolute; top:50%; right:0; transform:translateY(-50%);
-    width:26px; height:84px; border-radius:10px 0 0 10px;
+    position:absolute; top:50%; right:320px; transform:translateY(-50%);
+    width:22px; height:74px; border-radius:8px 0 0 8px;
     background:var(--panel-raised); border:1px solid var(--border); border-right:none;
-    color:var(--text-muted); cursor:pointer; z-index:30;
+    color:var(--text-muted); cursor:pointer; z-index:50;
     display:flex; align-items:center; justify-content:center;
     writing-mode:vertical-rl; font-family:var(--font-mono); font-size:10px; letter-spacing:.08em;
-    gap:6px;
+    gap:6px; transition:right .18s ease;
   }
   .chat-tab:hover{ color:var(--brass); border-color:var(--brass-dim); }
   .chat-tab:focus-visible{ outline:2px solid var(--brass); outline-offset:1px; }
   .chat-tab .chevron{ writing-mode:horizontal-tb; font-size:11px; }
+  .app-shell.chat-collapsed .chat-tab{ right:0; }
 
-  .chat-panel{
-    position:absolute; top:0; right:0; width:100%; height:100%;
-    background:var(--panel);
-    border-left:1px solid var(--border);
-    display:flex; flex-direction:column;
-    transform:translateX(100%);
-    transition:transform .38s cubic-bezier(.4,0,.2,1);
-    z-index:20;
-  }
-  .chat-panel.open{ transform:translateX(0); }
   .chat-panel-head{
     flex:none; padding:14px 44px 12px 18px; border-bottom:1px solid var(--border-soft);
     display:flex; flex-direction:column; gap:2px;
@@ -290,6 +320,7 @@
     width:100%; max-width:380px; background:var(--panel-raised); border:1px solid var(--border);
     border-radius:14px; padding:22px; font-family:var(--font-body); color:var(--text);
   }
+  .modal.wide{ max-width:600px; }
   .modal h2{ font-family:var(--font-display); font-weight:500; font-size:19px; margin:0 0 14px; }
   .mf-field{ margin-bottom:12px; }
   .mf-field label{
@@ -299,9 +330,11 @@
   .mf-input, .mf-textarea{
     width:100%; background:var(--panel); border:1px solid var(--border); border-radius:8px;
     padding:8px 10px; color:var(--text); font-family:var(--font-body); font-size:13.5px;
+    box-sizing:border-box;
   }
   .mf-input.mono{ font-family:var(--font-mono); }
   .mf-textarea{ min-height:80px; resize:vertical; }
+  .mf-textarea.large{ min-height:min(48vh, 380px); line-height:1.5; }
   .mf-row{ display:flex; gap:10px; }
   .mf-row .mf-field{ flex:1; }
   .cat-btn{
@@ -324,12 +357,16 @@
   @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
 
   @media (max-width:900px){
-    .app-shell{ width:96vw; height:92vh; min-width:0; flex-direction:column; }
-    .left-col{ width:100%; height:46%; border-right:none; border-bottom:1px solid var(--border); flex-direction:row; }
+    .app-shell{
+      width:100vw; height:100vh; min-width:0;
+      grid-template-columns:1fr;
+      grid-template-rows: 28% 46% 26%;
+    }
+    .left-col{ grid-column:1; grid-row:1; border-right:none; border-bottom:1px solid var(--border); flex-direction:row; }
     .left-col section{ border-bottom:none; border-right:1px solid var(--border-soft); flex:1; }
-    .cal-panel{ flex:1.4 1 0; }
-    .right-col{ height:54%; }
-    .chat-panel{ width:100%; }
+    .center-col{ grid-column:1; grid-row:2; border-right:none; border-bottom:1px solid var(--border); }
+    .right-col{ grid-column:1; grid-row:3; }
+    .chat-tab{ display:none; }
     .text-bubble:hover, .text-bubble.focused{ width:min(70vw, 420px); }
   }
 </style>
@@ -342,30 +379,8 @@
     Backend niedostępny — uruchom: <code>uvicorn main:app --reload --port 8000</code>
   </div>
 
-  <!-- ===================== LEFT COLUMN ===================== -->
+  <!-- ===================== LEFT COLUMN — reminders + notes ===================== -->
   <div class="left-col">
-
-    <section class="cal-panel">
-      <div class="panel-head">
-        <div>
-          <div class="panel-eyebrow"><span class="dot"></span>Kalendarz</div>
-          <div class="panel-title" id="calTitle">—</div>
-        </div>
-        <button class="mini-add" id="addEventBtn" title="Dodaj wydarzenie">+</button>
-      </div>
-      <div class="cal-nav">
-        <button id="calPrev">‹</button>
-        <span class="cal-date" id="calDateLabel">—</span>
-        <button id="calNext">›</button>
-        <button class="today-pill" id="calToday">dziś</button>
-      </div>
-      <div class="cal-scroll" id="calScroll">
-        <div class="cal-grid">
-          <div class="cal-ruler" id="calRuler"></div>
-          <div class="cal-track" id="calTrack"></div>
-        </div>
-      </div>
-    </section>
 
     <section class="rem-panel">
       <div class="panel-head">
@@ -391,25 +406,39 @@
 
   </div>
 
-  <!-- ===================== RIGHT COLUMN ===================== -->
-  <div class="right-col">
-    <div class="right-col-hint">
-      <div class="glyph">✦</div>
-      <div class="eyebrow">Historia rozmowy</div>
-      <div class="sub">Otwórz zakładkę po prawej, żeby zobaczyć poprzednie wiadomości.</div>
+  <!-- ===================== CENTER COLUMN — calendar ===================== -->
+  <div class="center-col">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow"><span class="dot"></span>Kalendarz</div>
+        <div class="panel-title" id="calTitle">—</div>
+      </div>
+      <button class="mini-add" id="addEventBtn" title="Dodaj wydarzenie">+</button>
     </div>
-
-    <button class="chat-tab" id="chatTab"><span class="chevron">‹</span> Czat</button>
-
-    <aside class="chat-panel" id="chatPanel">
-      <div class="chat-panel-head">
-        <span class="eyebrow">Asystent</span>
-        <span class="title">Historia rozmowy</span>
+    <div class="cal-nav">
+      <button id="calPrev">‹</button>
+      <span class="cal-date" id="calDateLabel">—</span>
+      <button id="calNext">›</button>
+      <button class="today-pill" id="calToday">dziś</button>
+    </div>
+    <div class="cal-scroll" id="calScroll">
+      <div class="cal-grid">
+        <div class="cal-ruler" id="calRuler"></div>
+        <div class="cal-track" id="calTrack"></div>
       </div>
-      <div class="chat-log" id="chatLog">
-        <div class="chat-log-empty" id="chatLogEmpty">Brak wiadomości. Napisz coś w polu na dole ekranu.</div>
-      </div>
-    </aside>
+    </div>
+  </div>
+
+  <!-- ===================== RIGHT COLUMN — chat sidebar ===================== -->
+  <button class="chat-tab" id="chatTab"><span class="chevron">›</span> Czat</button>
+  <div class="right-col" id="chatPanel">
+    <div class="chat-panel-head">
+      <span class="eyebrow">Asystent</span>
+      <span class="title">Czat</span>
+    </div>
+    <div class="chat-log" id="chatLog">
+      <div class="chat-log-empty" id="chatLogEmpty">Brak wiadomości. Napisz coś w polu na dole ekranu.</div>
+    </div>
   </div>
 
   <!-- ===================== BOTTOM-CENTER COMPOSER ===================== -->
@@ -425,7 +454,7 @@
 
 <!-- ===================== GENERIC MODAL (event / reminder / note) ===================== -->
 <div class="overlay" id="overlay" hidden>
-  <div class="modal">
+  <div class="modal" id="modalBox">
     <h2 id="modalTitle">Nowy wpis</h2>
     <div id="modalFields"></div>
     <div class="error-text" id="errorText"></div>
@@ -587,8 +616,8 @@
       var block=document.createElement('div');
       block.className='cal-event';
       block.style.top=top+'px'; block.style.height=height+'px';
-      block.style.left='calc('+(ev.col*widthPct)+'% + '+(ev.col?3:2)+'px)';
-      block.style.width='calc('+widthPct+'% - 5px)';
+      block.style.left='calc('+(ev.col*widthPct)+'% + '+(ev.col?4:2)+'px)';
+      block.style.width='calc('+widthPct+'% - 7px)';
       block.style.background=color;
       block.innerHTML='<div class="cal-event-title">'+escapeHtml(ev.title)+'</div><div class="cal-event-time">'+ev.start+'–'+ev.end+'</div>';
       block.addEventListener('click',function(evt){ evt.stopPropagation(); openEventModal(ev.id); });
@@ -603,14 +632,64 @@
       els.calTrack.appendChild(line);
     }
 
-    els.calTrack.onclick=function(e){
-      if(e.target!==els.calTrack) return;
-      var rect=els.calTrack.getBoundingClientRect();
-      var y=e.clientY-rect.top;
-      var minutes=Math.round((y/PX_PER_MIN)/5)*5;
-      openEventModal(null, minutes);
-    };
   }
+
+  // ---- click-and-drag on the calendar track to size a new event ----
+  function bindTrackDrag(track){
+    var dragging=false, startMin=0, preview=null, moved=false;
+
+    function yToMin(clientY){
+      var rect=track.getBoundingClientRect();
+      var y=clientY-rect.top+track.scrollTop*0; // track itself isn't scrolled, cal-scroll is
+      var minutes=Math.round((y/PX_PER_MIN)/5)*5;
+      return Math.max(0, Math.min(DAY_MIN, minutes));
+    }
+
+    function updatePreview(aMin,bMin){
+      var s=Math.min(aMin,bMin), e=Math.max(aMin,bMin,s+5);
+      if(!preview){
+        preview=document.createElement('div');
+        preview.className='cal-drag-preview';
+        preview.innerHTML='<span class="cal-drag-label"></span>';
+        track.appendChild(preview);
+      }
+      preview.style.top=(s*PX_PER_MIN)+'px';
+      preview.style.height=Math.max((e-s)*PX_PER_MIN,16)+'px';
+      preview.querySelector('.cal-drag-label').textContent = minutesToHHMM(s)+'–'+minutesToHHMM(e);
+    }
+
+    function removePreview(){
+      if(preview){ preview.remove(); preview=null; }
+    }
+
+    track.addEventListener('mousedown', function(e){
+      if(e.target!==track) return;
+      dragging=true; moved=false;
+      startMin=yToMin(e.clientY);
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e){
+      if(!dragging) return;
+      var curMin=yToMin(e.clientY);
+      if(Math.abs(curMin-startMin)>=5) moved=true;
+      updatePreview(startMin,curMin);
+    });
+
+    document.addEventListener('mouseup', function(e){
+      if(!dragging) return;
+      dragging=false;
+      var endMin=yToMin(e.clientY);
+      removePreview();
+      if(moved){
+        var s=Math.min(startMin,endMin), en=Math.max(startMin,endMin,s+5);
+        openEventModal(null, s, en);
+      } else {
+        openEventModal(null, startMin);
+      }
+    });
+  }
+  bindTrackDrag(els.calTrack);
 
   function scrollToNow(){
     if(state.calDate!==todayStr()) return;
@@ -632,7 +711,7 @@
   function renderReminders(){
     var today = todayStr();
     var todays = state.reminders
-      .filter(function(r){ return r.date===today; })
+      .filter(function(r){ return r.date===today && !r.done; })
       .sort(function(a,b){ return toMinutes(a.time)-toMinutes(b.time); });
 
     els.reminderList.innerHTML='';
@@ -642,9 +721,9 @@
     }
     todays.forEach(function(r){
       var item=document.createElement('div');
-      item.className='rem-item'+(r.done?' done':'');
+      item.className='rem-item';
       item.innerHTML =
-        '<span class="rem-check'+(r.done?' done':'')+'" data-id="'+r.id+'"></span>'+
+        '<span class="rem-check" data-id="'+r.id+'"></span>'+
         '<span class="rem-body"><span class="rem-time">'+r.time+'</span><br><span class="rem-text">'+escapeHtml(r.text)+'</span></span>';
       item.querySelector('.rem-check').addEventListener('click',function(e){
         e.stopPropagation();
@@ -662,17 +741,34 @@
   }
 
   // ================= NOTES =================
+  function formatNoteTime(iso){
+    if(!iso) return '';
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return '';
+    var sameDay = d.toDateString()===new Date().toDateString();
+    var time = d.toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'});
+    if(sameDay) return time;
+    return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})+' '+time;
+  }
+
   function renderNotes(){
     els.noteList.innerHTML='';
     if(state.notes.length===0){
       els.noteList.innerHTML='<div class="side-empty">Brak notatek.</div>';
       return;
     }
-    state.notes.forEach(function(n){
+    var sorted = state.notes.slice().sort(function(a,b){
+      return (b.updated_at||'').localeCompare(a.updated_at||'');
+    });
+    sorted.forEach(function(n){
       var item=document.createElement('div');
       item.className='note-item';
-      item.innerHTML='<span class="note-body"><span class="note-title">'+escapeHtml(n.title||'Bez tytułu')+'</span>'+
-        '<div class="note-snippet">'+escapeHtml(n.content||'')+'</div></span>';
+      item.innerHTML=
+        '<div class="note-head">'+
+          '<span class="note-title">'+escapeHtml(n.title||'Bez tytułu')+'</span>'+
+          '<span class="note-time">'+formatNoteTime(n.updated_at)+'</span>'+
+        '</div>'+
+        '<div class="note-snippet">'+escapeHtml(n.content||'')+'</div>';
       item.addEventListener('click',function(){ openNoteModal(n.id); });
       els.noteList.appendChild(item);
     });
@@ -686,6 +782,7 @@
 
   // ================= GENERIC MODAL =================
   var overlay=document.getElementById('overlay');
+  var modalBox=document.getElementById('modalBox');
   var modalTitle=document.getElementById('modalTitle');
   var modalFields=document.getElementById('modalFields');
   var errorText=document.getElementById('errorText');
@@ -699,13 +796,14 @@
     return '<div class="mf-field"><label>'+label+'</label>'+inner+'</div>';
   }
 
-  function openEventModal(id, prefillStart){
+  function openEventModal(id, prefillStart, prefillEnd){
     modalKind='event'; state.editing=id;
     modalTitle.textContent = id? 'Edytuj wydarzenie':'Nowe wydarzenie';
+    modalBox.classList.remove('wide');
     var ev = id? state.events.find(function(e){return e.id===id;}) : null;
     selectedCat = ev? ev.category : 'meeting';
     var start = ev? ev.start : (prefillStart!=null? minutesToHHMM(prefillStart) : '09:00');
-    var end = ev? ev.end : (prefillStart!=null? minutesToHHMM(Math.min(prefillStart+30,DAY_MIN-1)) : '09:30');
+    var end = ev? ev.end : (prefillEnd!=null? minutesToHHMM(prefillEnd) : (prefillStart!=null? minutesToHHMM(Math.min(prefillStart+30,DAY_MIN-1)) : '09:30'));
 
     modalFields.innerHTML =
       fieldHTML('Nazwa','<input id="mfTitle" class="mf-input" maxlength="60" value="'+(ev?escapeHtml(ev.title):'')+'">')+
@@ -721,7 +819,7 @@
       var b=document.createElement('button'); b.type='button';
       b.className='cat-btn'+(selectedCat===c.id?' active':'');
       b.innerHTML='<span class="cat-dot" style="background:'+CAT_COLOR[c.id]+'"></span>'+c.label;
-      b.addEventListener('click',function(){ selectedCat=c.id; openEventModal(id, prefillStart); });
+      b.addEventListener('click',function(){ selectedCat=c.id; openEventModal(id, prefillStart, prefillEnd); });
       catRow.appendChild(b);
     });
 
@@ -734,6 +832,7 @@
   function openReminderModal(id){
     modalKind='reminder'; state.editing=id;
     modalTitle.textContent = id? 'Edytuj przypomnienie':'Nowe przypomnienie';
+    modalBox.classList.remove('wide');
     var r = id? state.reminders.find(function(x){return x.id===id;}) : null;
     modalFields.innerHTML =
       fieldHTML('Treść','<input id="mfText" class="mf-input" maxlength="120" value="'+(r?escapeHtml(r.text):'')+'">')+
@@ -750,17 +849,18 @@
   function openNoteModal(id){
     modalKind='note'; state.editing=id;
     modalTitle.textContent = id? 'Edytuj notatkę':'Nowa notatka';
+    modalBox.classList.add('wide');
     var n = id? state.notes.find(function(x){return x.id===id;}) : null;
     modalFields.innerHTML =
       fieldHTML('Tytuł','<input id="mfTitle" class="mf-input" maxlength="60" value="'+(n?escapeHtml(n.title):'')+'">')+
-      fieldHTML('Treść','<textarea id="mfContent" class="mf-textarea" maxlength="600">'+(n?escapeHtml(n.content):'')+'</textarea>');
+      fieldHTML('Treść','<textarea id="mfContent" class="mf-textarea large" maxlength="4000">'+(n?escapeHtml(n.content):'')+'</textarea>');
     deleteBtn.hidden = !id;
     errorText.textContent='';
     overlay.hidden=false;
     document.getElementById('mfTitle').focus();
   }
 
-  function closeModal(){ overlay.hidden=true; modalKind=null; state.editing=null; }
+  function closeModal(){ overlay.hidden=true; modalKind=null; state.editing=null; modalBox.classList.remove('wide'); }
   cancelBtn.addEventListener('click', closeModal);
   overlay.addEventListener('click', function(e){ if(e.target===overlay) closeModal(); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !overlay.hidden) closeModal(); });
@@ -810,11 +910,11 @@
     }
   });
 
-  // ================= CHAT PANEL (slide in/out, history only) =================
-  var chatOpen = false;
+  // ================= CHAT PANEL (collapsible sidebar) =================
+  var chatOpen = true;
   function setChatOpen(open){
     chatOpen = open;
-    els.chatPanel.classList.toggle('open', open);
+    els.appShell.classList.toggle('chat-collapsed', !open);
     els.chatTab.querySelector('.chevron').textContent = open ? '›' : '‹';
   }
   els.chatTab.addEventListener('click', function(){ setChatOpen(!chatOpen); });
