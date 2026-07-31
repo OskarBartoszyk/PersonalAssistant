@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test głosu — diagnostyka</title>
+<style>
+  body{ margin:0; padding:32px; background:#0B0E15; color:#EDEFF4;
+        font-family:system-ui,-apple-system,sans-serif; line-height:1.5; }
+  h1{ font-size:20px; margin:0 0 4px; }
+  .sub{ color:#8890A6; font-size:13px; margin-bottom:24px; }
+  .row{ display:flex; gap:10px; align-items:flex-start; padding:10px 0;
+        border-bottom:1px solid #232939; }
+  .badge{ flex:none; width:56px; font-family:ui-monospace,monospace; font-size:11px;
+          font-weight:700; padding:2px 0; }
+  .ok{ color:#5FB88A; } .bad{ color:#E0785B; } .warn{ color:#CDA349; }
+  .what{ flex:1; min-width:0; }
+  .what b{ display:block; font-size:13.5px; }
+  .what span{ color:#8890A6; font-size:12.5px; word-break:break-word; }
+  button{ background:#CDA349; color:#1A1508; border:none; border-radius:8px;
+          padding:10px 18px; font-size:14px; font-weight:600; cursor:pointer;
+          margin:18px 8px 0 0; }
+  button:hover{ filter:brightness(1.08); }
+  #log{ margin-top:20px; background:#101420; border:1px solid #232939;
+        border-radius:8px; padding:12px 14px; font-family:ui-monospace,monospace;
+        font-size:12px; white-space:pre-wrap; min-height:90px; color:#8890A6; }
+  #heard{ color:#EDEFF4; font-size:15px; }
+</style>
+</head>
+<body>
+
+<h1>Diagnostyka głosu</h1>
+<div class="sub">Ta strona nie używa kodu aplikacji — sprawdza samą przeglądarkę.</div>
+
+<div id="checks"></div>
+
+<button id="micBtn">1. Sprawdź mikrofon i mów</button>
+<button id="ttsBtn">2. Powiedz coś na głos</button>
+
+<div id="log">Gotowe. Kliknij przycisk powyżej.</div>
+
+<script>
+const checks = document.getElementById('checks');
+const logEl = document.getElementById('log');
+function log(s){ logEl.textContent += '\n' + s; logEl.scrollTop = logEl.scrollHeight; }
+
+function row(state, title, detail){
+  const cls = state === true ? 'ok' : state === false ? 'bad' : 'warn';
+  const label = state === true ? 'OK' : state === false ? 'BŁĄD' : 'UWAGA';
+  checks.insertAdjacentHTML('beforeend',
+    `<div class="row"><div class="badge ${cls}">${label}</div>` +
+    `<div class="what"><b>${title}</b><span>${detail}</span></div></div>`);
+}
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const ua = navigator.userAgent;
+const isChrome = /Chrome\//.test(ua) && !/Edg\/|OPR\/|Brave/.test(ua);
+
+row(window.isSecureContext, 'Bezpieczny kontekst',
+    window.isSecureContext
+      ? location.origin + ' — OK (localhost liczy się jako bezpieczny)'
+      : 'Rozpoznawanie mowy wymaga https:// albo localhost. Otwierasz: ' + location.origin);
+
+row(!!SR, 'SpeechRecognition (mowa → tekst)',
+    SR ? 'Dostępne' : 'Niedostępne w tej przeglądarce — użyj Chrome');
+
+row('speechSynthesis' in window, 'speechSynthesis (tekst → mowa)',
+    'speechSynthesis' in window ? 'Dostępne' : 'Niedostępne');
+
+row(isChrome ? true : null, 'Przeglądarka',
+    ua.slice(0, 110) + (isChrome ? '' : ' — Firefox/Brave/Arc blokują to API'));
+
+function listVoices(){
+  const v = speechSynthesis.getVoices();
+  const pl = v.filter(x => x.lang && x.lang.toLowerCase().startsWith('pl'));
+  row(v.length ? (pl.length ? true : null) : false, 'Głosy do syntezy',
+      v.length
+        ? `${v.length} głosów, polskich: ${pl.length}` +
+          (pl.length ? ' → ' + pl.map(x => x.name).join(', ')
+                     : ' — odpowie innym głosem; w macOS: Ustawienia → Dostępność → Treść mówiona')
+        : 'Brak głosów');
+}
+if ('speechSynthesis' in window){
+  speechSynthesis.onvoiceschanged = () => {
+    document.querySelectorAll('.row').forEach((r,i,a) => { if (i === a.length-1 && r.textContent.includes('Głosy')) r.remove(); });
+    listVoices();
+  };
+  listVoices();
+}
+
+document.getElementById('micBtn').onclick = async () => {
+  logEl.textContent = 'Proszę o dostęp do mikrofonu…';
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+    s.getTracks().forEach(t => t.stop());
+    log('✓ Mikrofon przyznany.');
+  } catch (e) {
+    log('✗ Mikrofon odrzucony: ' + e.name + ' — ' + e.message);
+    log('  Kliknij kłódkę obok adresu i zezwól na mikrofon.');
+    return;
+  }
+  if (!SR) { log('✗ Brak SpeechRecognition — nie mogę nasłuchiwać.'); return; }
+
+  const r = new SR();
+  r.lang = 'pl-PL'; r.interimResults = true; r.continuous = false;
+  let heard = '';
+  r.onstart  = () => log('● Słucham… mów teraz (np. "co mam dzisiaj w planie")');
+  r.onresult = (e) => {
+    heard = '';
+    let interim = '';
+    for (let i = 0; i < e.results.length; i++){
+      (e.results[i].isFinal ? (heard += e.results[i][0].transcript)
+                            : (interim += e.results[i][0].transcript));
+    }
+    logEl.innerHTML = logEl.textContent.split('\n').slice(0,4).join('\n') +
+      '\n\n<span id="heard">' + (heard || interim) + '</span>';
+  };
+  r.onerror = (e) => log('✗ Błąd: ' + e.error +
+    (e.error === 'not-allowed' ? ' (zablokowany mikrofon)' :
+     e.error === 'network' ? ' (Chrome wysyła audio do Google — sprawdź internet)' :
+     e.error === 'no-speech' ? ' (nic nie usłyszałem)' : ''));
+  r.onend = () => log(heard.trim() ? '\n✓ Rozpoznano: "' + heard.trim() + '"'
+                                   : '\n✗ Nic nie rozpoznano.');
+  try { r.start(); } catch (e) { log('✗ start() rzucił: ' + e.message); }
+};
+
+document.getElementById('ttsBtn').onclick = () => {
+  if (!('speechSynthesis' in window)) { log('✗ Brak speechSynthesis'); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance('Test głosu. Jeśli to słyszysz, synteza mowy działa poprawnie.');
+  const pl = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('pl'));
+  if (pl) u.voice = pl;
+  u.lang = pl ? pl.lang : 'pl-PL';
+  u.onstart = () => log('● Mówię' + (pl ? ' głosem: ' + pl.name : ' (brak polskiego głosu)'));
+  u.onend   = () => log('✓ Synteza zakończona. Słyszałeś? Jeśli nie — sprawdź głośność i wyjście audio.');
+  u.onerror = (e) => log('✗ Błąd syntezy: ' + e.error);
+  speechSynthesis.speak(u);
+  log('Wysłano do syntezatora…');
+};
+</script>
+</body>
+</html>

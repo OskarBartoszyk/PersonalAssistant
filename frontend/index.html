@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalendarz — Asystent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+
+<div class="app-shell" id="appShell">
+
+  <div class="conn-banner" id="connBanner" hidden>
+    Brak połączenia z backendem — uruchom <code>uvicorn main:app --reload --port 8000</code>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <!-- ===================== LEFT COLUMN ===================== -->
+  <div class="left-col">
+
+    <section class="rem-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-eyebrow"><span class="dot"></span>Dziś</div>
+          <h2 class="panel-title">Przypomnienia</h2>
+        </div>
+        <button class="mini-add" id="addReminderBtn" title="Nowe przypomnienie">+</button>
+      </div>
+      <div class="side-list" id="reminderList"></div>
+    </section>
+
+    <section class="note-panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-eyebrow"><span class="dot"></span>Zapiski</div>
+          <h2 class="panel-title">Notatki</h2>
+        </div>
+        <button class="mini-add" id="addNoteBtn" title="Nowa notatka">+</button>
+      </div>
+      <div class="side-list" id="noteList"></div>
+    </section>
+
+  </div>
+
+  <!-- ===================== CENTER — CALENDAR ===================== -->
+  <div class="center-col">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow"><span class="dot"></span>Kalendarz</div>
+        <h2 class="panel-title" id="calTitle">—</h2>
+      </div>
+      <div class="view-switch" id="viewSwitch">
+        <button data-view="day">Dzień</button>
+        <button data-view="week">Tydzień</button>
+        <button data-view="month">Miesiąc</button>
+        <button data-view="year">Rok</button>
+      </div>
+    </div>
+
+    <div class="cal-nav">
+      <button id="calPrev" title="Wstecz">‹</button>
+      <button id="calNext" title="Dalej">›</button>
+      <span class="cal-date" id="calDateLabel">—</span>
+      <button class="today-pill" id="calToday">dziś</button>
+      <button class="mini-add" id="addEventBtn" title="Nowe wydarzenie">+</button>
+    </div>
+
+    <!-- day view -->
+    <div class="cal-scroll" id="dayScroll" hidden>
+      <div class="cal-grid">
+        <div class="cal-ruler" id="calRuler"></div>
+        <div class="cal-track" id="calTrack"></div>
+      </div>
+    </div>
+
+    <!-- week view -->
+    <div class="view-pane" id="weekWrap" hidden>
+      <div class="week-head" id="weekHead"></div>
+      <div class="cal-scroll" id="weekScroll">
+        <div class="cal-grid">
+          <div class="cal-ruler" id="weekRuler"></div>
+          <div class="week-cols" id="weekCols"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- month view -->
+    <div class="view-pane" id="monthWrap" hidden>
+      <div class="month-dow" id="monthDow"></div>
+      <div class="month-body">
+        <div class="month-grid" id="monthGrid"></div>
+      </div>
+    </div>
+
+    <!-- year view -->
+    <div class="year-scroll" id="yearScroll" hidden>
+      <div class="year-grid" id="yearGrid"></div>
+    </div>
+  </div>
+
+  <!-- ===================== RIGHT — CHAT ===================== -->
+  <button class="chat-tab" id="chatTab" title="Zwiń / rozwiń czat">
+    <span class="chevron">›</span>CZAT
+  </button>
+
+  <div class="right-col" id="chatPanel">
+    <div class="chat-panel-head">
+      <span class="eyebrow">Asystent</span>
+      <span class="title">Rozmowa</span>
+    </div>
+    <div class="chat-log" id="chatLog">
+      <div class="chat-log-empty" id="chatLogEmpty">
+        Brak wiadomości. Napisz coś na dole ekranu albo naciśnij mikrofon i mów.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== COMPOSER ===================== -->
+  <div class="voice-transcript" id="voiceTranscript" hidden>
+    <span class="vt-label">Słucham…</span>
+    <span id="vtFinal"></span><span class="vt-interim" id="vtInterim"></span>
+  </div>
+
+  <div class="composer">
+    <div class="text-bubble" id="textBubble">
+      <span class="bubble-icon">✎</span>
+      <input type="text" id="composerInput" placeholder="Napisz do asystenta i naciśnij Enter…" maxlength="500">
+    </div>
+    <button class="voice-btn" id="voiceBtn" title="Rozmowa głosowa">🎙</button>
+  </div>
+
+</div>
+
+<!-- ===================== MODAL ===================== -->
+<div class="overlay" id="overlay" hidden>
+  <div class="modal" id="modalBox">
+    <h2 id="modalTitle">Nowy wpis</h2>
+    <div id="modalFields"></div>
+    <div class="error-text" id="errorText"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px;">
+      <button id="deleteBtn" class="btn btn-delete" hidden>Usuń</button>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button id="cancelBtn" class="btn">Anuluj</button>
+        <button id="saveBtn" class="btn btn-primary">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

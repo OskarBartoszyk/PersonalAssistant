@@ -1,64 +1,98 @@
-# Kalendarz Agent — backend
+# Kalendarz Agent
+
+Osobisty asystent kalendarza: lokalny model (Ollama), FastAPI + SQLite,
+frontend bez build-stepu.
 
 ## Uruchomienie
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-ollama pull <model>              # patrz uwaga niżej
 uvicorn main:app --reload --port 8000
 ```
 
-Serwer wystartuje na `http://localhost:8000`. Baza danych `kalendarz.db`
-(SQLite) tworzy się automatycznie w tym samym katalogu przy pierwszym
-uruchomieniu.
+Otwórz **http://localhost:8000** — backend serwuje też frontend, więc nie ma
+CORS-a i moduły ES ładują się bez bundlera.
 
-Otwórz `kalendarz_agent.html` w przeglądarce — front łączy się z
-`http://localhost:8000` (zmienna `API_BASE` na górze skryptu).
+## Struktura
 
-## Uwaga o modelu
+```
+backend/
+  main.py     REST API + SSE, montuje frontend
+  db.py       schemat i dostęp do danych (SQLite)
+  agent.py    pętla agenta Ollama
+frontend/
+  index.html
+  css/app.css
+  js/api.js       stan, cache wydarzeń, klient HTTP
+  js/calendar.js  widoki dzień/tydzień/miesiąc/rok + drag & drop
+  js/panels.js    przypomnienia, notatki, pamięć, modal
+  js/chat.js      czat SSE + głos (Web Speech API)
+  js/app.js       bootstrap
+```
 
-W `main.py` `MODEL = "gemma4:e4b"` — podmień na tag modelu, który faktycznie
-masz ściągniętego w Ollama i który obsługuje tool-calling (np. `qwen2.5:7b`,
-`llama3.1:8b`, `mistral-nemo`). Nie każdy model w Ollama wspiera `tools=`;
-jeśli agent nigdy nie wywołuje narzędzi, to zwykle znaczy, że wybrany model
-tego nie obsługuje.
+`calendar.html` w katalogu głównym to poprzednia, jednoplikowa wersja —
+zastąpiona przez `frontend/`. Można ją usunąć.
 
-## Co robi backend
+## Wydajność
 
-- **REST CRUD** (`/api/events`, `/api/reminders`, `/api/notes`,
-  `/api/preferences`) — używane bezpośrednio przez UI (przyciski „+”,
-  edycja, usuwanie). Bez udziału modelu, więc jest natychmiastowe.
-- **`POST /api/chat`** — wiadomość użytkownika trafia do pętli agenta:
-  model decyduje, których narzędzi użyć (odczyt/zapis wydarzeń,
-  przypomnień, notatek, wyszukiwanie wolnych okien, zapamiętywanie
-  preferencji), Python je wykonuje na tej samej bazie SQLite, wynik wraca
-  do modelu, aż wygeneruje ostateczną odpowiedź tekstową.
-- **`GET /api/messages`** — historia czatu (zapisywana po stronie
-  serwera), ładowana przez front przy starcie.
+Profilowanie `gemma4:e4b` pokazało, gdzie faktycznie szedł czas:
 
-## Zestaw narzędzi agenta
+| co | pomiar |
+|---|---|
+| przetwarzanie promptu | 150–225 tok/s |
+| generowanie | 12,5 tok/s ← wąskie gardło |
+| tokeny na jedno wywołanie narzędzia | ~357, z czego ~350 to ukryte rozumowanie |
 
-`get_current_time`, `get_calendar_events`, `create_calendar_event`,
-`update_calendar_event`, `delete_calendar_event`, `find_free_slots`,
-`get_reminders`, `create_reminder`, `update_reminder`, `delete_reminder`,
-`get_notes`, `create_note`, `update_note`, `delete_note`,
-`get_user_preferences`, `update_user_preferences`.
+Cztery zmiany skróciły żądanie z 90 s+ do ~10–20 s:
 
-`update_user_preferences` to mechanizm uczenia preferencji z Twojego
-briefu projektu: gdy użytkownik poprawia agenta ("trening zawsze trwa
-40 minut"), model zapisuje to jako parę klucz/wartość, a `SYSTEM_PROMPT`
-instruuje go, żeby sprawdzał `get_user_preferences` przed planowaniem
-nawyków.
+1. **`think=False`** — `gemma4:e4b` to model rozumujący. Emitował ~1200 znaków
+   myślenia i zero treści, żeby wybrać jedno narzędzie. Wyłączenie: 514 → 106
+   tokenów wyjścia, i model od razu wywołuje właściwe narzędzie zamiast
+   marnować turę na odczyt.
+2. **Wstrzykiwanie kontekstu** — plan na dziś i jutro, pamięć i preferencje
+   trafiają prosto do promptu, więc model nie traci 30 s na `get_calendar_events`.
+3. **Potwierdzenia generowane w Pythonie** — po samych zapisach odpowiedź
+   („Dodalem: …”) buduje Python z tego, co naprawdę zrobiła baza. Oszczędza
+   turę modelu i uniemożliwia modelowi twierdzenie, że coś zapisał, gdy nie zapisał.
+4. **Stabilny prefiks promptu** — Ollama cache'uje KV prefiksu. Reguły statyczne
+   i schematy narzędzi (~1300 tokenów) są na początku i nigdy się nie zmieniają,
+   zmienny kontekst jest na końcu. Trafienie w cache: prefill 12,8 s → 0,0 s.
+   `warmup()` przy starcie rozgrzewa dokładnie ten prefiks, więc pierwsza
+   wiadomość użytkownika też jest szybka.
 
-## Dalsza rozbudowa (zgodnie z Twoim planem projektu)
+**Interfejs nie płaci tej latencji.** Przeciąganie, zmiana widoku, tworzenie
+i edycja idą bezpośrednio do SQLite — model nie bierze w tym udziału.
 
-- Etap 8 z Twojego dokumentu (pamięć semantyczna / RAG) łatwo dopiąć jako
-  kolejną tabelę + nowe narzędzia `remember_fact` / `recall_facts`, bez
-  zmiany reszty architektury.
-- Speech-to-Text/Text-to-Speech (Etap 7) podłącza się jako osobny
-  endpoint, np. `POST /api/voice` przyjmujący audio i zwracający tekst,
-  wpięty przed `run_agent`.
+## Pamięć
+
+- `memory_facts` — trwałe fakty (hobby, preferencje, cele, osoby); upsert po kluczu.
+- `routines` — cykliczne bloki tygodniowe.
+- `activity_log` — historia aktywności; `activity_stats()` liczy staż, sumy,
+  serie dni. Wydarzenia kategorii `habit` trafiają tu automatycznie.
+
+Historia czatu podawana modelowi jest **ograniczona do bieżącego dnia** —
+wczorajsze „jutro, czwartek 2026-07-30" powodowało, że model kopiował starą datę
+zamiast wyliczyć nową.
+
+## Skróty klawiszowe
+
+`D` dzień · `W` tydzień · `M` miesiąc · `R` rok · `←/→` nawigacja · `T` dziś ·
+`Spacja` mikrofon
+
+## Głos
+
+Web Speech API, lokalnie w przeglądarce (wymaga Chrome). Mówisz → asystent
+odpowiada **głosem**. Piszesz → odpowiada **tekstem**.
+
+## Narzędzia agenta
+
+`create/update/delete_calendar_event`, `get_calendar_events`, `find_free_slots`,
+`create/update/delete_reminder`, `get_reminders`, `create_note`, `get_notes`,
+`remember_fact`, `recall_facts`, `get_activity_stats`, `log_activity`,
+`create_routine`, `get_routines`.
+
+## Model
+
+`MODEL` w `agent.py`. Musi wspierać tool-calling — `gemma3:4b` **nie wspiera**,
+`gemma4:12b-mlx` działa, ale jest wolniejszy (5 tok/s vs 12,5).
